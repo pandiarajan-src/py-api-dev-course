@@ -1,6 +1,26 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, EmailStr
 from typing import Optional
 from datetime import datetime
+
+
+# Request for User
+class UserCreate(BaseModel):
+    email: EmailStr
+    password: str
+
+# Response for User
+class UserOut(BaseModel):
+    id: int
+    email: EmailStr
+    created_at: datetime
+
+    class Config:
+        orm_mode = True
+
+# Request for User Login
+class UserLoginRequest(BaseModel):
+    email: EmailStr
+    password: str
 
 # Request Base Model
 class PostBase(BaseModel):
@@ -19,6 +39,16 @@ class UpdatePost(CreatePost):
 class Post(PostBase):
     rating: int
     created_at: datetime
+    owner_id: int
+    owner: UserOut
     
     class Config:
         orm_mode = True
+
+# Request for Token
+class Token(BaseModel):
+    access_token: str
+    token_type: str
+
+class TokenData(BaseModel):
+    id: Optional[str] = None

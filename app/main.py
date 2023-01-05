@@ -1,74 +1,20 @@
-from fastapi import FastAPI, Response, status, HTTPException, Depends
-from fastapi.params import Body
-from random import randrange
-from typing import List
-from sqlalchemy.orm import Session
+from fastapi import FastAPI
 from . import models
-from .import schemas
-from .database import engine, get_db
+from . database import engine
+from . routers import users, posts, auth
+from . config import settings
 
 models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
 
+app.include_router(users.router)
+app.include_router(posts.router)
+app.include_router(auth.router)
+
 @app.get('/')
 async def root():
     return {"message": "Hello World!!! This is my first Fast API app"}
-
-@app.get('/posts', response_model=List[schemas.Post])
-async def get_posts(db: Session = Depends(get_db)):
-    posts = db.query(models.Posts).all()
-    if len(posts) == 0:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"No posts were found")
-    return posts
-
-@app.get('/posts/latest', response_model=schemas.Post)
-async def get_latest_post(db: Session = Depends(get_db)):
-    post = db.query(models.Posts).order_by(models.Posts.created_at.desc()).limit(1).first()
-    if post is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"No posts were found")
-    return post
-
-@app.get('/posts/{id}', response_model=schemas.Post)
-async def get_post(id: int, db: Session = Depends(get_db)):
-    post = db.query(models.Posts).filter(models.Posts.id == id).first()
-    if post is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"post with id:{id} is not found")
-    return post
-
-@app.post('/posts', status_code=status.HTTP_201_CREATED, response_model=schemas.Post)
-def create_posts(payload: schemas.CreatePost, db: Session = Depends(get_db)):
-    print(payload.dict())
-    my_post = payload.dict()
-    # new_post = models.Posts(title=payload.title, content=payload.content, published=payload.published, rating=payload.rating)
-    new_post = models.Posts(**payload.dict())
-    db.add(new_post)
-    db.commit()
-    db.refresh(new_post)
-    if new_post is None:
-        raise HTTPException(status_code=status.HTTP_500_INTERNAL_SERVER_ERROR, detail=f"post with id:{id} is not found")    
-    return new_post
-
-
-@app.delete('/posts/{id}', status_code=status.HTTP_204_NO_CONTENT, )
-def delete_posts(id: int, db: Session = Depends(get_db)):
-    post = db.query(models.Posts).filter(models.Posts.id == id)
-    if post.first() is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"post with id: {id} not found")        
-    else:
-        post.delete(synchronize_session=False)
-        db.commit()
-        return Response(status_code=status.HTTP_204_NO_CONTENT)
-
-@app.put('/posts/{id}', status_code=status.HTTP_200_OK, response_model=schemas.Post)
-def update_posts(id: int, payload: schemas.UpdatePost, db: Session = Depends(get_db)):
-    post = db.query(models.Posts).filter(models.Posts.id == id)
-    if post.first() is None:
-        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"post with id: {id} not found")        
-    else:
-        post.update(payload.dict(), synchronize_session=False)
-        db.commit()
-        return post.first()
 
 
 ##############################################################################################################
