@@ -1,6 +1,7 @@
 from fastapi import FastAPI, Response, status, HTTPException, Depends, APIRouter
 from typing import List, Optional
 from sqlalchemy.orm import Session
+from sqlalchemy import func
 from .. import models, schemas, oauth2
 from .. database import get_db
 
@@ -9,17 +10,21 @@ router = APIRouter(
     tags=["Posts"]
 )
 
-@router.get('/', response_model=List[schemas.Post])
+@router.get('/', response_model=List[schemas.PostResult])
 async def get_posts(db: Session = Depends(get_db), 
                     current_user: int = Depends(oauth2.get_current_user),
                     limit: int = 10, skip: int = 0, search: Optional[str] = ""):
     # To return posts of all users
-    posts = db.query(models.Posts).filter(models.Posts.title.contains(search)).limit(limit).offset(skip).all()
+    #posts = db.query(models.Posts).filter(models.Posts.title.contains(search)).limit(limit).offset(skip).all()
+
+    results = db.query(models.Posts, func.count(models.Votes.post_id).label("votes")).join(
+        models.Votes, models.Votes.post_id == models.Posts.id, isouter=True).group_by(models.Posts.id).filter(
+            models.Posts.title.contains(search)).limit(limit).offset(skip).all()
     # to return posts of only the specific owner of the post
     # posts = db.query(models.Posts).filter(models.Posts.owner_id == current_user.id).all()
-    if len(posts) == 0:
+    if len(results) == 0:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"No posts were found")
-    return posts
+    return results
 
 @router.get('/latest', response_model=schemas.Post)
 async def get_latest_post(db: Session = Depends(get_db), current_user: int = Depends(oauth2.get_current_user)):
@@ -28,13 +33,15 @@ async def get_latest_post(db: Session = Depends(get_db), current_user: int = Dep
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"No posts were found")
     return post
 
-@router.get('/{id}', response_model=schemas.Post)
+@router.get('/{id}', response_model=schemas.PostResult)
 async def get_post(id: int, db: Session = Depends(get_db), 
                     current_user: int = Depends(oauth2.get_current_user)):
-    post = db.query(models.Posts).filter(models.Posts.id == id).first()
-    if post is None:
+    #post = db.query(models.Posts).filter(models.Posts.id == id).first()
+    result = db.query(models.Posts, func.count(models.Votes.post_id).label("votes")).join(
+        models.Votes, models.Votes.post_id == models.Posts.id, isouter=True).group_by(models.Posts.id).filter(models.Posts.id == id).first()
+    if result is None:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail=f"post with id:{id} is not found")
-    return post
+    return result
 
 @router.post('/', status_code=status.HTTP_201_CREATED, response_model=schemas.Post)
 def create_posts(payload: schemas.CreatePost, db: Session = Depends(get_db), current_user: int = Depends(oauth2.get_current_user)):
