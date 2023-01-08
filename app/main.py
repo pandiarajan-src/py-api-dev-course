@@ -1,12 +1,30 @@
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
+
 from . import models
 from . database import engine
 from . routers import users, posts, auth, votes
 from . config import settings
 
-models.Base.metadata.create_all(bind=engine)
+#
+# if you have alembic then this create is not required.
+# This is required only incase of sqlalchemy without alembic.
+#
+# models.Base.metadata.create_all(bind=engine)
 
 app = FastAPI()
+
+origins = [
+    "http://www.google.com",
+]
+
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=origins,
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 app.include_router(users.router)
 app.include_router(posts.router)
